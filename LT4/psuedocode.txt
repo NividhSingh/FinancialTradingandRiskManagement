@@ -1,0 +1,23 @@
+main:
+    If (position is not empty):
+        - If market depth is still positive with a margin, reinput limit orders
+        - else place market order (or limit orders below market)
+
+    if (have tender offer):
+        - If have position in the opposite direction, subtract that from tender offer
+            - Check market depth
+                - if bigger than margin, create
+        - If have position in same direction, keep that in mind
+        - 
+
+
+market vs limit:
+    - Check ticker 
+        - if less than 25 seconds left create market orders
+    - If market depth is not over margin, place market orders
+    - If bid ask spread is small, place market orders
+    
+    
+
+create market orders:
+    - Place limit under market so they get filled but don't get screwed over by disappearing liquidity
