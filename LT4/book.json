@@ -1,0 +1,15 @@
+{
+  "order_id": 106,
+  "period": 1,
+  "tick": 8,
+  "trader_id": "ANON",
+  "ticker": "CRZY_A",
+  "quantity": 7000.0,
+  "price": 9.95,
+  "type": "LIMIT",
+  "action": "SELL",
+  "quantity_filled": 2200.0,
+  "vwap": 10.03,
+  "status": "OPEN", 
+  "market": "A"
+}

@@ -79,7 +79,7 @@ def get_from_api(session, url):
 
     return response
 
-def get_books(session, underlying_security, bid_or_ask):
+def get_books(session, underlying_security, bid_or_ask, markets_info):
     """This function creates a list of all active orders for a security
 
     Args:
@@ -93,16 +93,17 @@ def get_books(session, underlying_security, bid_or_ask):
     Returns:
         List: List of dicts where each dict is an order
     """
-    main_market = get_from_api(session, f"securities/book?ticker={underlying_security}_M")
-    alternate_market = get_from_api(session, f"securities/book?ticker={underlying_security}_A")
-    
-    main_market = main_market.json()
-    alternate_market = alternate_market.json()
+    markets_books = []
+    for market in markets_info.keys():
+        markets_books.append(get_from_api(session, f"securities/book?ticker={underlying_security}_{market}").json())
+
     book = []
-    for order in main_market[bid_or_ask]:
-        book.append(order)
-    for order in alternate_market[bid_or_ask]:
-        book.append(order)
+
+    for market in markets_books:
+        for order in market[bid_or_ask]:
+            order["market"] = order["ticker"][-1]
+            order["quantity"] = (order["quantity"] - order["quantity_filled"]) * markets_info[order["market"]]["safety_factor"]
+            book.append(order)
 
     book.sort(key=lambda x: x["price"], reverse=bid_or_ask == "bids")
     
@@ -133,7 +134,7 @@ def decrease_quantity(quantity, change):
     """
     return quantity + change * (-1 if quantity > 0 else 1)
 
-def remove_portfolio_quantity_from_book(session, books, portfolio, ticker):
+def remove_portfolio_quantity_from_book(session, books, portfolio, ticker, markets):
     """Removes the portfolio quantity from the book, with the idea that we get rid of 
     portfolio position before adding position
 
@@ -179,7 +180,7 @@ def reject_tender(session, tender_id):
     print("Rejected Tender")
     response = session.delete(f'http://localhost:9999/v1/tenders/{tender_id}')
 
-def evaluate_tender(books, tender, margin):
+def evaluate_tender(books, tender, margin, market_info):
     """Evaluates if a tender is worth taking
 
     Args:
@@ -213,5 +214,6 @@ def evaluate_tender(books, tender, margin):
         return True
     
     return False
+
 
 # def go_through_orders()

@@ -8,8 +8,10 @@ from tqdm.auto import tqdm
 import requests
 from helpers import *
 
-margin = .2
-safety_factor = 1.0
+# Variables to change
+margin = .2 # Minimum margin 
+market_info = {"M": {"safety_factor": 1.0}, "A": {"safety_factor": 1.0}}
+securities = ["CRZY", "TAME"]
 
 # this is the main method containing the actual order routing logic
 def main():
@@ -29,11 +31,11 @@ def main():
         while tick <= 300:
             # get and print the two books to the prompt
             books = {}
-            portfolio = get_portfolio(s)
-            for ticker in ["CRZY", "TAME"]:
+            portfolio = get_portfolio(s) #, markets)
+            for ticker in securities:
                 books[ticker] = {}
                 for order_type in ["bids", "asks"]:
-                    books[ticker][order_type] = get_books(s, ticker, order_type)
+                    books[ticker][order_type] = get_books(s, ticker, order_type, market_info)
             tenders = get_tenders(s)
             
             # Go through orders
@@ -46,7 +48,7 @@ def main():
                 if ticker in portfolio.keys() and portfolio[ticker] != 0:
                     # Tender goes in the same direction as portfolio
                     if (portfolio[ticker] > 0) == (tender["action"] == "BUY"):
-                        remove_portfolio_quantity_from_book(s, books, portfolio, ticker)
+                        remove_portfolio_quantity_from_book(s, books, portfolio, ticker, market_info)
                     else:
                         if (abs(portfolio[ticker]) > abs(tender["quantity"])):
                             # TODO: Accept Tender
@@ -56,7 +58,7 @@ def main():
                         else:
                             tender["quantity"] -= portfolio
                 
-                if evaluate_tender(books, tender, margin):
+                if evaluate_tender(books, tender, margin, market_info):
                     accept_tender(s, tender["tender_id"])
                 
                 else:
