@@ -100,6 +100,7 @@ def get_books(session, underlying_security, bid_or_ask, markets_info):
     book = []
 
     for market in markets_books:
+        print(market)
         for order in market[bid_or_ask]:
             order["market"] = order["ticker"][-1]
             order["quantity"] = (order["quantity"] - order["quantity_filled"]) * markets_info[order["market"]]["safety_factor"]
@@ -199,17 +200,25 @@ def evaluate_tender(books, tender, margin, market_info):
     
     # TODO: The following logic should be modulaized
     while quantity != 0:
+        if (len(books[ticker]["bids" if quantity < 0 else "asks"]) == 0):
+            return False
         if (books[ticker]["bids" if quantity < 0 else "asks"][0]["quantity"] <= quantity):
             order = book_for_ticker["bids" if quantity < 0 else "asks"].pop(0)
             quantity -= order["quantity"]
+            # print(order["price"])
             sum += order["quantity"] * order["price"]
         else:
             # book_for_ticker["bids" if quantity < 0 else "asks"][0]["quantity"] -= quantity
-            sum = quantity * book_for_ticker["bids" if quantity < 0 else "asks"][0]["price"]
+            sum += quantity * book_for_ticker["bids" if quantity < 0 else "asks"][0]["price"]
+            # print(order["price"])
             quantity = 0
     
-    vwap = sum / tender["quantity"]
-    
+    vwap = sum / abs(tender["quantity"])
+    print()
+    print(sum)
+    print(tender["quantity"])
+    print(vwap)
+    print(tender)
     if (tender["action"] == "BUY" and vwap - margin > tender["price"]) or (tender["action"] == "SELL" and vwap + margin < tender["price"]): 
         return True
     
