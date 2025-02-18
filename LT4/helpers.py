@@ -17,7 +17,7 @@ def signal_handler(signum, frame):
     shutdown = True
 
 # set your API key to authenticate to the RIT client
-API_KEY = {'X-API-Key': 'ABIXYN28'}
+API_KEY = {'X-API-Key': '90P5EPK6'}
 shutdown = False
 
 def get_portfolio(session):
@@ -168,7 +168,7 @@ def accept_tender(session, tender_id):
         tender_id (int): the tender id for the tender to accept
     """
     print("Accepted Tender")
-    response = session.post(f'http://localhost:9999/v1/tenders/{tender_id}')    
+    # response = session.post(f'http://localhost:9999/v1/tenders/{tender_id}')    
 
 def reject_tender(session, tender_id):
     """Rejects the tender with the tender id
@@ -191,6 +191,8 @@ def evaluate_tender(books, tender, margin, market_info):
     Returns:
         boolean: true if user should accept and false if user should decline
     """
+    if "price" not in tender.keys():
+        tender["price"] = 0
     ticker = tender['ticker'][:4]
     quantity = tender["quantity"] * (-1 if tender["action"] == "SELL" else 1)
     book_for_ticker = books[ticker].copy()
@@ -205,10 +207,11 @@ def evaluate_tender(books, tender, margin, market_info):
             sum += order["quantity"] * order["price"]
         else:
             # book_for_ticker["bids" if quantity < 0 else "asks"][0]["quantity"] -= quantity
-            sum = quantity * book_for_ticker["bids" if quantity < 0 else "asks"][0]["price"]
+            sum += quantity * book_for_ticker["bids" if quantity < 0 else "asks"][0]["price"]
             quantity = 0
     
     vwap = sum / tender["quantity"]
+    print(f"vwap: {vwap}", end="\t")
     
     if (tender["action"] == "BUY" and vwap - margin > tender["price"]) or (tender["action"] == "SELL" and vwap + margin < tender["price"]): 
         return True
