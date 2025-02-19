@@ -10,7 +10,7 @@ from helpers import *
 
 # Variables to change
 margin = .2 # Minimum margin 
-market_info = {"M": {"safety_factor": 1.0}, "A": {"safety_factor": 1.0}}
+market_info = {"M": {"safety_factor": 1.0}, "A": {"safety_factor": 1.0}} 
 securities = ["CRZY", "TAME"]
 
 # this is the main method containing the actual order routing logic

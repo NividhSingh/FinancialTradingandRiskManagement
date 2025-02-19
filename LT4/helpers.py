@@ -100,7 +100,7 @@ def get_books(session, underlying_security, bid_or_ask, markets_info):
     book = []
 
     for market in markets_books:
-        print(market)
+        # print(market)
         for order in market[bid_or_ask]:
             order["market"] = order["ticker"][-1]
             order["quantity"] = (order["quantity"] - order["quantity_filled"]) * markets_info[order["market"]]["safety_factor"]
@@ -214,11 +214,11 @@ def evaluate_tender(books, tender, margin, market_info):
             quantity = 0
     
     vwap = sum / abs(tender["quantity"])
-    print()
-    print(sum)
-    print(tender["quantity"])
-    print(vwap)
-    print(tender)
+    # print()
+    # print(sum)
+    # print(tender["quantity"])
+    # print(vwap)
+    # print(tender)
     if (tender["action"] == "BUY" and vwap - margin > tender["price"]) or (tender["action"] == "SELL" and vwap + margin < tender["price"]): 
         return True
     
