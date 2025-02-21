@@ -5,9 +5,11 @@ import itertools
 from time import sleep
 import signal
 import requests
+from tqdm.auto import tqdm
 
 import helpers
 import constants
+
 
 class ApiException(Exception):
     pass
@@ -202,7 +204,8 @@ def accept_tender(session, tender_id):
         session (requests.Session): An active session object configured to communicate with the RIT API.
         tender_id (int): the tender id for the tender to accept
     """
-    print("Accepted Tender")
+    tqdm.write("Accepted Order")
+
     response = session.post(f'http://localhost:9999/v1/tenders/{tender_id}')    
 
 def reject_tender(session, tender_id):

@@ -8,6 +8,7 @@ import requests
 import constants
 from scipy.stats import norm
 import math
+from tqdm.auto import tqdm
 
 NORMAL_TENDER = 1
 WINNER_TAKES_ALL = 2
@@ -122,7 +123,7 @@ def evaluate_tender(books, books_with_fees, portfolio, tender, tick):
     
     # Do step 3 first (because its easier in terms of programming this way). Step 3 based on write up
     if try_not_selling(tick, tender, underlying_price):
-        print("No Selling")
+        tqdm.write("No Selling")
         return True
     
     total_portfolio_quantity = total = sum(abs(value) for value in portfolio.values())
@@ -173,15 +174,15 @@ def evaluate_tender(books, books_with_fees, portfolio, tender, tick):
     average = (val + vwap) / 2 if vwap != -1 else val
 
     if constants.DEBUG:
-        print("underlying price: " + str(underlying_price[tender["ticker"]]))
-        print(f"val: {val}")
+        tqdm.write("underlying price: " + str(underlying_price[tender["ticker"]]))
+        tqdm.write(f"val: {val}")
 
 
-        print("tender price: " + str(tender["price"]))
-        print(f"tender action:" + str(tender["action"]))
+        tqdm.write("tender price: " + str(tender["price"]))
+        tqdm.write(f"tender action:" + str(tender["action"]))
         
-        print(tender["price"] > average)
-        print(tender["action"] == "SELL")
+        tqdm.write(tender["price"] > average)
+        tqdm.write(tender["action"] == "SELL")
     
     return (tender["price"] > average) == (tender["action"] == "SELL")
 
@@ -229,7 +230,7 @@ def calculate_vwap(quantity, book):
     vwap = float(sum) / float(original_quantity)
     
     if constants.DEBUG:
-        print(f"VWAP: {vwap}")
+        tqdm.write(f"VWAP: {vwap}")
     
     return vwap
     

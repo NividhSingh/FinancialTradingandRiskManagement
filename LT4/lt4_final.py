@@ -9,6 +9,7 @@ import requests
 from old_code.helpers import *
 import api_helpers
 import helpers
+import constants
 
 # Variables to change
 margin = .2 # Minimum margin 
@@ -19,10 +20,12 @@ securities = ["CRZY", "TAME"]
 def main():
     # creates a session to manage connections and requests to the RIT Client
     with requests.Session() as s:
-        while True:
+            
+        if constants.PROGRESS_BAR:
             # Create Progress Bar
             max_progress = 300        
             pbar = tqdm(total=max_progress, desc="Processing")
+        while True:
 
             # add the API key to the session to authenticate during requests
             s.headers.update(API_KEY)
@@ -40,9 +43,10 @@ def main():
                 if helpers.evaluate_tender(books, books_with_fees, portfolio, tender, tick):
                     api_helpers.accept_tender(s, tender["tender_id"])
 
-            # Update Progress Bar
-            pbar.n = tick
-            pbar.refresh()
+            if constants.PROGRESS_BAR:
+                # Update Progress Bar
+                pbar.n = tick
+                pbar.refresh()
 
 
 # this calls the main() method when you type 'python lt3.py' into the command prompt
