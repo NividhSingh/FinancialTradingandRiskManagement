@@ -21,8 +21,8 @@ def main():
     with requests.Session() as s:
         while True:
             # Create Progress Bar
-            # max_progress = 300        
-            # pbar = tqdm(total=max_progress, desc="Processing")
+            max_progress = 300        
+            pbar = tqdm(total=max_progress, desc="Processing")
 
             # add the API key to the session to authenticate during requests
             s.headers.update(API_KEY)
@@ -40,8 +40,9 @@ def main():
                 if helpers.evaluate_tender(books, books_with_fees, portfolio, tender, tick):
                     api_helpers.accept_tender(s, tender["tender_id"])
 
-
-            sleep(1)
+            # Update Progress Bar
+            pbar.n = tick
+            pbar.refresh()
 
 
 # this calls the main() method when you type 'python lt3.py' into the command prompt
