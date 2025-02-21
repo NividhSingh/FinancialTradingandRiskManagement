@@ -5,224 +5,263 @@ import itertools
 from time import sleep
 import signal
 import requests
+import constants
+from scipy.stats import norm
+import math
 
+NORMAL_TENDER = 1
+WINNER_TAKES_ALL = 2
+COMPETATIVE_TENDERS = 3
 
-class ApiException(Exception):
-    pass
-
-# this signal handler allows for a graceful shutdown when CTRL+C is pressed
-def signal_handler(signum, frame):
-    global shutdown
-    signal.signal(signal.SIGINT, signal.SIG_DFL)
-    shutdown = True
-
-# set your API key to authenticate to the RIT client
-API_KEY = {'X-API-Key': 'ABIXYN28'}
-shutdown = False
-
-def get_portfolio(session):
-    """Gets the user's current portfolio positions
+def type_of_tender(tender):
+    """Figures out what type of tender it is
 
     Args:
-        session (requests.Session): An active session object configured to communicate with the RIT API.
+        tender (dict): dict with tender information
 
     Returns:
-        dict: dict where the key is the base security and the value is the position of that security
+        int: represents what type of tender
     """
+    
+    # If fixed bid, its a normal tender
+    if tender["is_fixed_bid"]:
+        return NORMAL_TENDER
+    
+    # TODO: Test the following
+    # If winner in tender caption, winner take all tender
+    elif "winner" in tender["caption"]:
+        return WINNER_TAKES_ALL
+    
+    # If none of the above, its a competative tender
+    else:
+        return COMPETATIVE_TENDERS
 
-    securities_response = session.get('http://localhost:9999/v1/securities')
-    securities_response = securities_response.json()
-    
-    portfolio = {}
 
-    # Change format into dict where keys are the tickers and values are     
-    for security in securities_response:
-        portfolio[security["base_security"]] = security["position"]
-    
-    return portfolio
-    
-    
-def get_tick(session):
-    """Gets the current tick of the running case
+def split_market_from_ticker(d):
+    """Takes a dict and splits the security so there's a key for dictionary and the ticker is "CRZY" instead of "CRZY_M"
 
     Args:
-        session (requests.Session): An active session object configured to communicate with the RIT API.
-
-    Returns:
-        int: the current tick of the running case
+        d (dict): dict of something (could be order, or tender or portfolio, etc)
     """
-    resp = get_from_api(session, 'case')
-    case = resp.json()
-    return case['tick']
-
-def get_from_api(session, url):
-    """
-    Retrieves data from the RIT Client REST API for a specified security.
-
-    Args:
-        session (requests.Session): An active session object configured to communicate with the RIT API.
-        url (str): The URL segment specifying the security to retrieve (appended to the base endpoint).
-
-    Raises:
-        ApiException: If the API returns a 401 Unauthorized status code, indicating that the API key is incorrect.
-
-    Returns:
-        requests.Response: The HTTP response object returned by the API call.
-    """
-    response = session.get(f'http://localhost:9999/v1/{url}')
     
-    if response.status_code == 401:
-        raise ApiException(
-            'The API key provided in this Python code must match that in the RIT client '
-            '(please refer to the API hyperlink in the client toolbar and/or the RIT – User Guide – REST API Documentation.pdf)'
-        )
+    # If there is more than one market, split it
+    if len(constants.MARKETS.keys()) > 1:
+        d["market"] = d["ticker"][-1]
+        d["ticker"] = d["ticker"][:-2]
+        
+    # If there is just one market, everything is in the main market
+    else:
+        d["market"] = "M"
 
-    return response
 
-def get_books(session, underlying_security, bid_or_ask, markets_info):
-    """This function creates a list of all active orders for a security
+def remove_quantity_from_book(quantity, book):
+    """Removes some quantity of shares from the book
 
     Args:
-        session (requests.Session): An active session object configured to communicate with the RIT API.
-        underlying_security (string): the underlying security (like CRZY)
-        bid_or_ask (string): "bids" or "asks" depending on which one we want
-
-    Raises:
-        ApiException: _description_
-
-    Returns:
-        List: List of dicts where each dict is an order
+        quantity (int): the quantity being removed
+        book (list of dicts): list of dicts representing orders
     """
-    markets_books = []
-    for market in markets_info.keys():
-        markets_books.append(get_from_api(session, f"securities/book?ticker={underlying_security}_{market}").json())
-
-    book = []
-
-    for market in markets_books:
-        # print(market)
-        for order in market[bid_or_ask]:
-            order["market"] = order["ticker"][-1]
-            order["quantity"] = (order["quantity"] - order["quantity_filled"]) * markets_info[order["market"]]["safety_factor"]
-            book.append(order)
-
-    book.sort(key=lambda x: x["price"], reverse=bid_or_ask == "bids")
     
-    return book
-
-def get_tenders(session):
-    """Gets all the current tender offers 
-
-    Args:
-        session (requests.Session): An active session object configured to communicate with the RIT API.
-
-    Returns:
-        list of dicts: Each dict is a tender offer
-    """
-    tenders = get_from_api(session, "tenders")
-    tenders = tenders.json()
-    return tenders
-
-def decrease_quantity(quantity, change):
-    """Returns the value you get if you decrease quantity by change (even if quantity is negative)
-
-    Args:
-        quantity (int): quantity (of security)
-        change (int): how much you're getting rid of
-
-    Returns:
-        int: new quantity
-    """
-    return quantity + change * (-1 if quantity > 0 else 1)
-
-def remove_portfolio_quantity_from_book(session, books, portfolio, ticker, markets):
-    """Removes the portfolio quantity from the book, with the idea that we get rid of 
-    portfolio position before adding position
-
-    Args:
-        session (requests.Session): An active session object configured to communicate with the RIT API.
-        books (dict of dict of list of dicts): All the orders organized in {ticker: {"asks": [{order info}, {order info}], "bids": []}}
-        portfolio (dict): dict of positions for each underlying stock
-        ticker (string): ticker we are reducing value of
-
-    Returns:
-        dict of dict of list of dicts: returning new books (but pass by reference so probably don't have to do this)
-    """
-    quantity = portfolio[ticker]
-    
+    # While the quantity isn't 0, keep going 
     while quantity != 0:
-        if len(books[ticker]["bids" if quantity < 0 else "asks"]) and (books[ticker]["bids" if quantity < 0 else "asks"][0]["quantity"] <= quantity):
-            order = books[ticker]["bids" if quantity < 0 else "asks"].pop(0)
-            quantity = decrease_quantity(quantity, order["quantity"])
-        else:
-            if len(books[ticker]["bids" if quantity < 0 else "asks"]) > 0:
-                books[ticker]["bids" if quantity < 0 else "asks"][0]["quantity"] -= quantity
+        
+        # If no more orders in book, return -1 to signal no more orders
+        if len(book) == 0:
+            return -1
+        
+        # The next order is bigger than the quantity left
+        if book[0]["quantity"] > quantity:
+            book[0]["quantity"] -= quantity
             quantity = 0
-    
-    return books
-
-def accept_tender(session, tender_id):
-    """Accepts the tender with the tender id
-
-    Args:
-        session (requests.Session): An active session object configured to communicate with the RIT API.
-        tender_id (int): the tender id for the tender to accept
-    """
-    print("Accepted Tender")
-    response = session.post(f'http://localhost:9999/v1/tenders/{tender_id}')    
-
-def reject_tender(session, tender_id):
-    """Rejects the tender with the tender id
-
-    Args:
-        session (requests.Session): An active session object configured to communicate with the RIT API.
-        tender_id (int): the tender id for the tender to accept
-    """
-    print("Rejected Tender")
-    response = session.delete(f'http://localhost:9999/v1/tenders/{tender_id}')
-
-def evaluate_tender(books, tender, margin, market_info):
-    """Evaluates if a tender is worth taking
-
-    Args:
-        books (dict of dict of list of dicts): All the orders organized in {ticker: {"asks": [{order info}, {order info}], "bids": []}}
-        tender (dict): Information for the tender
-        margin (int): minimum margin for us to take the tender
-
-    Returns:
-        boolean: true if user should accept and false if user should decline
-    """
-    ticker = tender['ticker'][:4]
-    quantity = tender["quantity"] * (-1 if tender["action"] == "SELL" else 1)
-    book_for_ticker = books[ticker].copy()
-    sum = 0
-    
-    
-    # TODO: The following logic should be modulaized
-    while quantity != 0:
-        if (len(books[ticker]["bids" if quantity < 0 else "asks"]) == 0):
-            return False
-        if (books[ticker]["bids" if quantity < 0 else "asks"][0]["quantity"] <= quantity):
-            order = book_for_ticker["bids" if quantity < 0 else "asks"].pop(0)
+            
+        # The quantity left is bigger than the next order quantity
+        else:
+            order = book.pop(0)
             quantity -= order["quantity"]
-            # print(order["price"])
-            sum += order["quantity"] * order["price"]
-        else:
-            # book_for_ticker["bids" if quantity < 0 else "asks"][0]["quantity"] -= quantity
-            sum += quantity * book_for_ticker["bids" if quantity < 0 else "asks"][0]["price"]
-            # print(order["price"])
-            quantity = 0
+
+def get_underlying_price(books, tick):
+    """Gets the underlying price by finding the bid ask spread for the anonymous users
+
+    Args:
+        books (dict of dict of list of dicts): [security][bid or ask][order number] gives you an order
+        tick (int): tick we are on
+
+    Returns:
+        float: bid ask spread based on anonymous users
+    """
+    underlying_prices = {}
     
-    vwap = sum / abs(tender["quantity"])
-    # print()
-    # print(sum)
-    # print(tender["quantity"])
-    # print(vwap)
-    # print(tender)
-    if (tender["action"] == "BUY" and vwap - margin > tender["price"]) or (tender["action"] == "SELL" and vwap + margin < tender["price"]): 
+    # Go through each security
+    for security, security_book in books.items():
+        
+        # If the tick is less than two (there might not be any orders yet), return the start price
+        if tick < 2:
+            underlying_prices[security] = constants.SECURITIES[security]["START_PRICE"]
+            
+        # Return the average of the first bid and first ask based on the book without market fees
+        underlying_prices[security] = (security_book[list(security_book.keys())[0]][0]["price"] + security_book[list(security_book.keys())[1]][0]["price"]) / 2
+    
+    
+    return underlying_prices
+
+def evaluate_tender(books, books_with_fees, portfolio, tender, tick):
+    """Evaluate if a tender is profitable
+
+    Args:
+        books (dict of dict of list of dicts): represents the book seperated by securities and bids/asks
+        books_with_fees (dict of dict of list of dicts): same as above but includes fees
+        portfolio (dict): dict where key is security and value is portfolio quantity
+        tender (dict): dict representing information about tender
+        tick (int): tick we are on
+
+    Returns:
+        bool: boolean for if it is profitible or not profitible
+    """
+    
+    underlying_price = get_underlying_price(books, tick)
+    
+    # Do step 3 first (because its easier in terms of programming this way). Step 3 based on write up
+    if try_not_selling(tick, tender, underlying_price):
+        print("No Selling")
         return True
     
-    return False
+    total_portfolio_quantity = total = sum(abs(value) for value in portfolio.values())
+    
+    # Step 1: Remove Portfolio Quantity
+    if portfolio[tender["ticker"]] != 0:
+        
+        # Same direction (either negative quantity and we're selling or positive quantity and we're buying)
+        if (portfolio[tender["ticker"]] < 0) == (tender["action"] == "SELL"):
+            
+            # Exceeds Limit
+            if (abs(portfolio[tender["ticker"]]) + abs(tender["quantity"]) > constants.TRADING_LIMITS["SECURITY_LIMIT"] or total_portfolio_quantity + abs(tender["quantity"]) > constants.TRADING_LIMITS["GROSS_LIMIT"]):
+                return False
+
+            # Remove portfolio quantity from book
+            else:
+                remove_quantity_from_book(abs(portfolio[tender["ticker"]]), books_with_fees[tender["ticker"]]["asks" if portfolio[tender["ticker"]] < 0 else "bids"])
+                portfolio[tender["ticker"]] = 0
 
 
-# def go_through_orders()
+        # Opposite direction (like we're short and we are buying stock)
+        else:
+            # Portfolio Quantity is greater
+            if portfolio[tender["ticker"]] > tender["quantity"]:
+                remove_quantity_from_book(abs(portfolio[tender["ticker"]] - tender["quantity"]), books_with_fees[tender["ticker"]]["asks" if portfolio[tender["ticker"]] < 0 else "bids"])
+                tender["quantity"] -= tender["quantity"]
+            
+            # Tender quantity is greater
+            else:
+                tender["quantity"] -= tender["quantity"]
+
+    # Step 2: Account for market Change
+    vwap = calculate_vwap(tender["quantity"], books_with_fees[tender["ticker"]]["asks" if tender["action"] == "SELL" else "bids"])
+    
+    # We want a lower bound if we're buying (we want price to be higher than) or a higher bound if selling
+    probability = .05 if tender["action"] == "BUY" else .95
+    
+    orders = math.ceil(tender["quantity"]/constants.TRADING_LIMITS["ORDER_LIMIT"])
+    
+    order_time = orders * constants.RATE_LIMIT
+    
+    ticks_to_offload = order_time / constants.SPEED
+    
+    # Factor in the volitility
+    val = underlying_price[tender["ticker"]] * (1 + constants.SECURITIES[tender["ticker"]]["VOLITILITY"] * norm.ppf(probability, 0, constants.SECURITIES[tender["ticker"]]["VOLITILITY"] * math.sqrt(ticks_to_offload / constants.TICKS)))
+    
+    # Average between worst case price and vwap or if vwap isn't deep enough just the worst case underlying price
+    average = (val + vwap) / 2 if vwap != -1 else val
+
+    if constants.DEBUG:
+        print("underlying price: " + str(underlying_price[tender["ticker"]]))
+        print(f"val: {val}")
+
+
+        print("tender price: " + str(tender["price"]))
+        print(f"tender action:" + str(tender["action"]))
+        
+        print(tender["price"] > average)
+        print(tender["action"] == "SELL")
+    
+    return (tender["price"] > average) == (tender["action"] == "SELL")
+
+    
+def calculate_vwap(quantity, book):
+    """Calcualtes volume weighted average for the first quantity in book
+
+    Args:
+        quantity (int): quantity to find vwap for
+        book (list of dicts): list of orders
+
+    Returns:
+        float: vwap
+    """
+    
+    book_copy = book.copy()
+    
+    # If quantity is 0 (doesn't make sense for this context), we return 0
+    if quantity == 0:
+        return -1
+    
+    # Initialize variables
+    sum = 0
+    original_quantity = quantity
+    
+    # While quantity isn't 0
+    while quantity != 0:
+        
+        # If no more orders in book, we return -1 (otherwise vwap might be a lot less than it should be)
+        if len(book_copy) <= 0:
+            return -1
+        
+        # If first order is bigger, calculated based on quantity
+        if book_copy[0]["quantity"] > quantity:
+            sum += book_copy[0]["price"] * quantity
+            book_copy[0]["quantity"] -= quantity
+            quantity = 0
+            
+        # If quantity is bigger, remove the first one (which only doesn't cause errors because we're working with a copy of the book)
+        else:
+            order = book_copy.pop(0)
+            sum += order["price"] * order["quantity"]
+            quantity -= order["quantity"]
+    
+    vwap = float(sum) / float(original_quantity)
+    
+    if constants.DEBUG:
+        print(f"VWAP: {vwap}")
+    
+    return vwap
+    
+    
+def try_not_selling(tick, tender, underlying_price):
+    """Checks if its profitible to not sell and just pay penalties with a 95% certainty
+
+    Args:
+        tick (int): What tick we're at
+        tender (dict): dict representing current tender
+        underlying_price (float): underlying price based on ANOM traders
+
+    Returns:
+        bool: whether its profitible or not profitible
+    """
+    # Step 3: Check not selling offers
+    ticks_left = constants.TICKS - tick
+    
+    # We want a lower bound if we're buying (we want price to be higher than) or a higher bound if selling
+    probability = .05 if tender["action"] == "BUY" else .95
+    
+    # Factor in the volitility
+    # TODO: the line below and above is repeated so modulize 
+    val = underlying_price[tender["ticker"]] * (1 + norm.ppf(probability, 0, constants.SECURITIES[tender["ticker"]]["VOLITILITY"] * constants.SECURITIES[tender["ticker"]]["VOLITILITY"] * math.sqrt(ticks_left / constants.TICKS)))
+    
+    tender_price = tender["price"]
+    
+    # Factor in the fees
+    if tender["action"] == "BUY":
+        tender_price += constants.ENV_INFO["D"]
+    else:
+        tender_price -= constants.ENV_INFO["D"]
+    
+    # If the tender price is below the final price (withi 95% certainty) and we're selling, this is good. If tender is above final price and we're buying this is also good
+    return tender_price > val == tender["action"] == "SELL"
