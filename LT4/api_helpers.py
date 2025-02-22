@@ -133,7 +133,10 @@ def get_book(session, underlying_security, bid_or_ask, with_fees):
             helpers.split_market_from_ticker(order)
             order["quantity"] = (order["quantity"] - order["quantity_filled"])
             if with_fees:
-                order["price"] += constants.MARKETS[order["market"]]["MARKET_COST"]
+                if bid_or_ask == "bids":
+                    order["price"] += constants.MARKETS[order["market"]]["MARKET_COST"]
+                else:
+                    order["price"] -= constants.MARKETS[order["market"]]["MARKET_COST"]
             book.append(order)
 
     # Sort the books by 
