@@ -25,10 +25,12 @@ def main():
             # Create Progress Bar
             max_progress = 300        
             pbar = tqdm(total=max_progress, desc="Processing")
+        
+        # add the API key to the session to authenticate during requests
+        s.headers.update(API_KEY)
+        
         while True:
 
-            # add the API key to the session to authenticate during requests
-            s.headers.update(API_KEY)
             # get the current time of the case
             tick = get_tick(s)
 
