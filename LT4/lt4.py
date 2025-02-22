@@ -37,7 +37,6 @@ def main():
             portfolio = api_helpers.get_portfolio(s)
             tenders = api_helpers.get_tenders(s)
 
-            a = (api_helpers.get_from_api(s, "case").json())
             for tender in tenders:
                 helpers.split_market_from_ticker(tender)
                 if helpers.evaluate_tender(books, books_with_fees, portfolio, tender, tick):
