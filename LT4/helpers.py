@@ -54,6 +54,17 @@ def split_market_from_ticker(d):
     else:
         d["market"] = "M"
 
+def combine_market_with_ticker(d):
+    """Adds market back to ticker for the final security ticker to send back
+
+    Args:
+        d (dict): dict that we are trying to combine for
+    """
+    # If there is more than one market, combine with market
+    if len(constants.MARKETS.keys()) > 1:
+        d["ticker"] = d["ticker"] + "_" + d["market"]
+        
+
 
 def remove_quantity_from_book(quantity, book):
     """Removes some quantity of shares from the book
