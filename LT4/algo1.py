@@ -45,11 +45,43 @@ def main():
 
             for security, security_books in books.items():
                 
-                if len(security_books["bids"]) > 0 and len(security_books["asks"]) > 0.02:
-                    if security_books["bids"][0]["price"] > security_books["asks"][0]["price"]:
+                if len(security_books["bids"]) > 0 and len(security_books["asks"]):
+                    if security_books["bids"][0]["price"] > security_books["asks"][0]["price"] > .2:
                         print(security_books["bids"][0]["price"] - security_books["asks"][0]["price"])
                         print("Doing stuff")
-                        minimum_quantity = min(min(security_books["bids"][0]["quantity"], security_books["asks"][0]["quantity"]), 10000)
+                        minimum_quantity = min(min(security_books["bids"][0]["quantity"], security_books["asks"][0]["quantity"]) * .7, 10000)
+                        helpers.combine_market_with_ticker(security_books["bids"][0])
+                        helpers.combine_market_with_ticker(security_books["asks"][0])
+                        response1 = s.post('http://localhost:9999/v1/orders', params={'ticker': security_books["bids"][0]["ticker"], 'type': 'MARKET', 'quantity': minimum_quantity, 'action': 'SELL'})
+                        response2 = s.post('http://localhost:9999/v1/orders', params={'ticker': security_books["asks"][0]["ticker"], 'type': 'MARKET', 'quantity': minimum_quantity, 'action': 'BUY'})
+                        
+                        print(security_books["bids"][0]["price"])
+                        print(security_books["asks"][0]["price"])
+                        
+                        print(response1.json()["vwap"])
+                        print(response2.json()["vwap"])
+                        
+                    
+                        sleep(.5)
+                        
+                        print(security_books["bids"][0]["price"] - security_books["asks"][0]["price"])
+                        print("Doing stuff")
+                        minimum_quantity = min(min(security_books["bids"][0]["quantity"], security_books["asks"][0]["quantity"]) * .7, 10000)
+                        helpers.combine_market_with_ticker(security_books["bids"][0])
+                        helpers.combine_market_with_ticker(security_books["asks"][0])
+                        response1 = s.post('http://localhost:9999/v1/orders', params={'ticker': security_books["bids"][0]["ticker"], 'type': 'MARKET', 'quantity': minimum_quantity, 'action': 'BUY'})
+                        response2 = s.post('http://localhost:9999/v1/orders', params={'ticker': security_books["asks"][0]["ticker"], 'type': 'MARKET', 'quantity': minimum_quantity, 'action': 'SELL'})
+                        
+                        print(security_books["bids"][0]["price"])
+                        print(security_books["asks"][0]["price"])
+                        
+                        print(response1.json()["vwap"])
+                        print(response2.json()["vwap"])
+                        continue
+                    elif security_books["bids"][0]["price"] > security_books["asks"][0]["price"] > .02:
+                        print(security_books["bids"][0]["price"] - security_books["asks"][0]["price"])
+                        print("Doing stuff")
+                        minimum_quantity = min(min(security_books["bids"][0]["quantity"], security_books["asks"][0]["quantity"]) * .7, 10000)
                         helpers.combine_market_with_ticker(security_books["bids"][0])
                         helpers.combine_market_with_ticker(security_books["asks"][0])
                         response1 = s.post('http://localhost:9999/v1/orders', params={'ticker': security_books["bids"][0]["ticker"], 'type': 'MARKET', 'quantity': minimum_quantity, 'action': 'SELL'})

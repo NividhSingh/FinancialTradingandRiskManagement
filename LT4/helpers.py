@@ -49,6 +49,7 @@ def split_market_from_ticker(d):
     if len(constants.MARKETS.keys()) > 1:
         d["market"] = d["ticker"][-1]
         d["ticker"] = d["ticker"][:-2]
+        print(d["ticker"])
         
     # If there is just one market, everything is in the main market
     else:
