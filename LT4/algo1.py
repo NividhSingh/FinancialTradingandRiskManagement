@@ -20,6 +20,7 @@ securities = ["CRZY", "TAME"]
 def main():
     # creates a session to manage connections and requests to the RIT Client
     with requests.Session() as s:
+        print("Starting")
             
         if constants.PROGRESS_BAR:
             # Create Progress Bar
@@ -28,7 +29,7 @@ def main():
         
 
         # add the API key to the session to authenticate during requests
-        s.headers.update(API_KEY)
+        s.headers.update(constants.API_KEY)
         
         while True:
             # get the current time of the case
@@ -38,17 +39,17 @@ def main():
             books_with_fees = api_helpers.get_books(s, True)
             portfolio = api_helpers.get_portfolio(s)
             tenders = api_helpers.get_tenders(s)
+            
+            if not tick % 3:
+                print(f"Updated{tick}")
 
             for security, security_books in books.items():
-                # print(security_books["bids"][0]["price"])
-                # print(security_books["asks"][0]["price"])
-                if len(security_books["bids"]) > 0 and len(security_books["asks"]) > 0:
-                    if security_books["bids"][0]["price"] > security_books["asks"][0]["price"] + .20:
+                
+                if len(security_books["bids"]) > 0 and len(security_books["asks"]) > 0.02:
+                    if security_books["bids"][0]["price"] > security_books["asks"][0]["price"]:
                         print(security_books["bids"][0]["price"] - security_books["asks"][0]["price"])
-
-                    # if security_books["bids"][0]["price"] - constants.MARKETS[security_books["bids"][0]["market"]]["MARKET_COST"] > security_books["asks"][0]["price"] + constants.MARKETS[security_books["bids"][0]["market"]]["MARKET_COST"]:
                         print("Doing stuff")
-                        minimum_quantity = min(security_books["bids"][0]["quantity"], security_books["asks"][0]["quantity"]) * .7
+                        minimum_quantity = min(min(security_books["bids"][0]["quantity"], security_books["asks"][0]["quantity"]), 10000)
                         helpers.combine_market_with_ticker(security_books["bids"][0])
                         helpers.combine_market_with_ticker(security_books["asks"][0])
                         response1 = s.post('http://localhost:9999/v1/orders', params={'ticker': security_books["bids"][0]["ticker"], 'type': 'MARKET', 'quantity': minimum_quantity, 'action': 'SELL'})
@@ -59,7 +60,6 @@ def main():
                         
                         print(response1.json()["vwap"])
                         print(response2.json()["vwap"])
-                        return 1
                         continue
                     
                     
