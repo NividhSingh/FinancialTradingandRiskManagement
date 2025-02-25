@@ -28,7 +28,7 @@ def main():
         
 
         # add the API key to the session to authenticate during requests
-        s.headers.update(API_KEY)
+        s.headers.update(constants.API_KEY)
         
         while True:
             # get the current time of the case
