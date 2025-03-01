@@ -116,7 +116,7 @@ def get_underlying_price(books, tick):
         ask = 0
         
         while bid_index < len(security_book[list(security_book.keys())[0]]):
-            if (security_book[list(security_book.keys())[0]][bid_index]['trader_id'] and not constants.EVERYONE_ANON) or (int(security_book[list(security_book.keys())[0]][bid_index]['quantity']) not in [1000, 10000] and constants.EVERYONE_ANON)
+            if (security_book[list(security_book.keys())[0]][bid_index]['trader_id'] and not constants.EVERYONE_ANON) or (int(security_book[list(security_book.keys())[0]][bid_index]['quantity']) not in [1000, 10000] and constants.EVERYONE_ANON):
                 bid = security_book[list(security_book.keys())[0]][bid_index]['price']
                 break
         else:
