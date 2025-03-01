@@ -14,6 +14,8 @@ NORMAL_TENDER = 1
 WINNER_TAKES_ALL = 2
 COMPETATIVE_TENDERS = 3
 
+underlying_price = {}
+
 def type_of_tender(tender):
     """Figures out what type of tender it is
 
@@ -63,8 +65,6 @@ def combine_market_with_ticker(d):
     # If there is more than one market, combine with market
     if len(constants.MARKETS.keys()) > 1:
         d["ticker"] = d["ticker"] + "_" + d["market"]
-        
-
 
 def remove_quantity_from_book(quantity, book):
     """Removes some quantity of shares from the book
@@ -109,7 +109,21 @@ def get_underlying_price(books, tick):
         # If the tick is less than two (there might not be any orders yet), return the start price
         if tick < 2:
             underlying_prices[security] = constants.SECURITIES[security]["START_PRICE"]
-            
+        
+        bid_index = 0
+        ask_index = 0
+        bid = 0
+        ask = 0
+        
+        while bid_index < len(security_book[list(security_book.keys())[0]]):
+            if (security_book[list(security_book.keys())[0]][bid_index]['trader_id'] and not constants.EVERYONE_ANON) or (int(security_book[list(security_book.keys())[0]][bid_index]['quantity']) not in [1000, 10000] and constants.EVERYONE_ANON)
+                bid = security_book[list(security_book.keys())[0]][bid_index]['price']
+                break
+        else:
+            underlying_price[security].append(underlying_price[security][-1])
+            return
+        
+            bid_index += 1
         # Return the average of the first bid and first ask based on the book without market fees
         underlying_prices[security] = (security_book[list(security_book.keys())[0]][0]["price"] + security_book[list(security_book.keys())[1]][0]["price"]) / 2
     
@@ -197,7 +211,6 @@ def evaluate_tender(books, books_with_fees, portfolio, tender, tick):
     
     return (tender["price"] > average) == (tender["action"] == "SELL")
 
-    
 def calculate_vwap(quantity, book):
     """Calcualtes volume weighted average for the first quantity in book
 
@@ -245,7 +258,6 @@ def calculate_vwap(quantity, book):
     
     return vwap
     
-    
 def try_not_selling(tick, tender, underlying_price):
     """Checks if its profitible to not sell and just pay penalties with a 95% certainty
 
@@ -270,6 +282,7 @@ def try_not_selling(tick, tender, underlying_price):
     tender_price = tender["price"]
     
     # Factor in the fees
+    # TODO: Change to val instead of tender_price
     if tender["action"] == "BUY":
         tender_price += constants.ENV_INFO["D"]
     else:
