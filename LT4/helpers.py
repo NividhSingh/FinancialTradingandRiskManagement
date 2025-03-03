@@ -161,6 +161,7 @@ def evaluate_tender(books, books_with_fees, portfolio, tender, tick):
             
             # Exceeds Limit
             if (abs(portfolio[tender["ticker"]]) + abs(tender["quantity"]) > constants.TRADING_LIMITS["SECURITY_LIMIT"] or total_portfolio_quantity + abs(tender["quantity"]) > constants.TRADING_LIMITS["GROSS_LIMIT"]):
+                print("Here")
                 return False
 
             # Remove portfolio quantity from book
@@ -196,6 +197,7 @@ def evaluate_tender(books, books_with_fees, portfolio, tender, tick):
     val = underlying_price[tender["ticker"]] * (1 + constants.SECURITIES[tender["ticker"]]["VOLITILITY"] * norm.ppf(probability, 0, constants.SECURITIES[tender["ticker"]]["VOLITILITY"] * math.sqrt(ticks_to_offload / constants.TICKS)))
     
     # Average between worst case price and vwap or if vwap isn't deep enough just the worst case underlying price
+    print(vwap != -1)
     average = (val + vwap) / 2 if vwap != -1 else val
 
     if constants.DEBUG:
@@ -208,9 +210,12 @@ def evaluate_tender(books, books_with_fees, portfolio, tender, tick):
         
         tqdm.write(tender["price"] > average)
         tqdm.write(tender["action"] == "SELL")
+    print(f"{type_of_tender(tender)} average: ", end="\t")
+    print(average)
+    if type_of_tender(tender) == NORMAL_TENDER:
+        return (tender["price"] > average) == (tender["action"] == "SELL")
+    return False
     
-    return (tender["price"] > average) == (tender["action"] == "SELL")
-
 def calculate_vwap(quantity, book):
     """Calcualtes volume weighted average for the first quantity in book
 
@@ -259,6 +264,7 @@ def calculate_vwap(quantity, book):
     return vwap
     
 def try_not_selling(tick, tender, underlying_price):
+    return False
     """Checks if its profitible to not sell and just pay penalties with a 95% certainty
 
     Args:
