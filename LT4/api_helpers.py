@@ -8,7 +8,7 @@ import requests
 from tqdm.auto import tqdm
 
 import helpers
-import constants
+import constants_1 as constants
 
 
 class ApiException(Exception):
@@ -84,6 +84,24 @@ def get_from_api(session, url):
         response = session.get(f'http://localhost:9999/v1/{url}')
 
     return response
+
+def get_original_books(session):
+    """This function gets a list of all the books
+
+    Args:
+        session (requests.Session): An active session object configured to communicate with the RIT API
+
+    Returns:
+        dict of dict of lists: books organized by security and bid/ask
+    """
+    books = {}
+    securities = get_from_api(session, "securities").json()
+    securities = [x["ticker"] for x in securities]
+    for security in securities:
+        books[security] = {}
+        books[security] = get_from_api(session, f"securities/book?ticker={security}").json()
+    
+    return books
 
 
 def get_books(session, with_fees):
@@ -207,9 +225,11 @@ def accept_tender(session, tender_id):
         session (requests.Session): An active session object configured to communicate with the RIT API.
         tender_id (int): the tender id for the tender to accept
     """
-    tqdm.write("Accepted Order")
+    print("Accept Tender")
+    
+    # tqdm.write("Accepted Order")
 
-    response = session.post(f'http://localhost:9999/v1/tenders/{tender_id}')    
+    # response = session.post(f'http://localhost:9999/v1/tenders/{tender_id}')    
 
 def reject_tender(session, tender_id):
     """Rejects the tender with the tender id

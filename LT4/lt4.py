@@ -33,7 +33,6 @@ def main():
             books_with_fees = api_helpers.get_books(s, True)
             portfolio = api_helpers.get_portfolio(s)
             tenders = api_helpers.get_tenders(s)
-            print("running")
             for tender in tenders:
                 print("Here")
                 helpers.split_market_from_ticker(tender)

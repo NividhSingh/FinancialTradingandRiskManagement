@@ -5,7 +5,7 @@ import itertools
 from time import sleep
 import signal
 import requests
-import constants
+import constants_1 as constants
 from scipy.stats import norm
 import math
 from tqdm.auto import tqdm
@@ -90,45 +90,81 @@ def remove_quantity_from_book(quantity, book):
         else:
             order = book.pop(0)
             quantity -= order["quantity"]
-
+            
 def get_underlying_price(books, tick):
-    """Gets the underlying price by finding the bid ask spread for the anonymous users
-
+    """
+    Gets the underlying price by finding the bid-ask spread based on anonymous users.
+    
+    Each security_book is a dict with two keys, "bids" and "asks". If EVERYONE_ANON is True,
+    then we select the first bid and ask where the quantity is not 1000 or 10000.
+    Otherwise, we select the first bid and ask where the trader_id is "anon".
+    The underlying price is the average of the selected bid and ask prices.
+    
     Args:
-        books (dict of dict of list of dicts): [security][bid or ask][order number] gives you an order
-        tick (int): tick we are on
-
+        books (dict): A dictionary where each key is a security and each value is a dict
+                      with keys "bids" and "asks", and each of these is a list of orders.
+        tick (int): The current tick.
+    
     Returns:
-        float: bid ask spread based on anonymous users
+        dict: A dictionary mapping each security to its computed underlying price.
     """
     underlying_prices = {}
     
-    # Go through each security
     for security, security_book in books.items():
-        
-        # If the tick is less than two (there might not be any orders yet), return the start price
+        # If there might not be any orders yet, return the start price.
         if tick < 2:
             underlying_prices[security] = constants.SECURITIES[security]["START_PRICE"]
-        
-        bid_index = 0
-        ask_index = 0
-        bid = 0
-        ask = 0
-        
-        while bid_index < len(security_book[list(security_book.keys())[0]]):
-            if (security_book[list(security_book.keys())[0]][bid_index]['trader_id'] and not constants.EVERYONE_ANON) or (int(security_book[list(security_book.keys())[0]][bid_index]['quantity']) not in [1000, 10000] and constants.EVERYONE_ANON):
-                bid = security_book[list(security_book.keys())[0]][bid_index]['price']
-                break
+            continue
+
+        # Select bid order.
+        bid_order = None
+        for order in security_book.get("bids", []):
+            # Skip non-dictionary entries.
+            if not isinstance(order, dict):
+                continue
+            if constants.EVERYONE_ANON:
+                # When everyone is anonymous, we want orders where quantity isn't 1000 or 10000.
+                if int(order.get("quantity", 0)) not in [1000, 10000]:
+                    bid_order = order
+                    break
+            else:
+                # Otherwise, we want orders where the trader_id is "anon".
+                if order.get("trader_id") == "anon":
+                    bid_order = order
+                    break
+
+        # Select ask order.
+        ask_order = None
+        for order in security_book.get("asks", []):
+            if not isinstance(order, dict):
+                continue
+            if constants.EVERYONE_ANON:
+                if int(order.get("quantity", 0)) not in [1000, 10000]:
+                    ask_order = order
+                    break
+            else:
+                if order.get("trader_id") == "anon":
+                    ask_order = order
+                    break
+
+        # If we didn't find a valid bid or ask, we can default to the first valid order if available.
+        if bid_order is None and security_book.get("bids"):
+            bid_order = next((o for o in security_book["bids"] if isinstance(o, dict)), None)
+        if ask_order is None and security_book.get("asks"):
+            ask_order = next((o for o in security_book["asks"] if isinstance(o, dict)), None)
+
+        # If both orders were found, average their prices.
+        if bid_order is not None and ask_order is not None:
+            bid_price = float(bid_order.get("price", 0))
+            ask_price = float(ask_order.get("price", 0))
+            underlying_prices[security] = (bid_price + ask_price) / 2
         else:
-            underlying_price[security].append(underlying_price[security][-1])
-            return
-        
-            bid_index += 1
-        # Return the average of the first bid and first ask based on the book without market fees
-        underlying_prices[security] = (security_book[list(security_book.keys())[0]][0]["price"] + security_book[list(security_book.keys())[1]][0]["price"]) / 2
-    
+            # In case one of the sides is missing, fallback to start price.
+            underlying_prices[security] = constants.SECURITIES[security]["START_PRICE"]
     
     return underlying_prices
+
+
 
 def evaluate_tender(books, books_with_fees, portfolio, tender, tick):
     """Evaluate if a tender is profitable
@@ -197,7 +233,6 @@ def evaluate_tender(books, books_with_fees, portfolio, tender, tick):
     val = underlying_price[tender["ticker"]] * (1 + constants.SECURITIES[tender["ticker"]]["VOLITILITY"] * norm.ppf(probability, 0, constants.SECURITIES[tender["ticker"]]["VOLITILITY"] * math.sqrt(ticks_to_offload / constants.TICKS)))
     
     # Average between worst case price and vwap or if vwap isn't deep enough just the worst case underlying price
-    print(vwap != -1)
     average = (val + vwap) / 2 if vwap != -1 else val
 
     if constants.DEBUG:
@@ -210,8 +245,11 @@ def evaluate_tender(books, books_with_fees, portfolio, tender, tick):
         
         tqdm.write(tender["price"] > average)
         tqdm.write(tender["action"] == "SELL")
+        
+    
     print(f"{type_of_tender(tender)} average: ", end="\t")
     print(average)
+    
     if type_of_tender(tender) == NORMAL_TENDER:
         return (tender["price"] > average) == (tender["action"] == "SELL")
     return False
