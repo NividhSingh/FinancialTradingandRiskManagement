@@ -8,7 +8,7 @@ import requests
 from tqdm.auto import tqdm
 
 import helpers
-import constants_1 as constants
+import constants_6 as constants
 
 
 class ApiException(Exception):

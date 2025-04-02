@@ -5,7 +5,7 @@ import itertools
 from time import sleep
 import signal
 import requests
-import constants_1 as constants
+import constants_6 as constants
 from scipy.stats import norm
 import math
 from tqdm.auto import tqdm
