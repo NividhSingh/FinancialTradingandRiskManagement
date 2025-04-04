@@ -8,8 +8,8 @@ from time import sleep
 # --------------------------
 API_KEY = {'X-API-Key': 'ABIXYN28'}
 SPREAD = 0.02              # Price offset for bid/ask
-ORDER_VOLUME = 1000         # Volume per order (each side)
-ORDER_RATE = 20             # Maximum orders per second allowed by the API
+ORDER_VOLUME = 100         # Volume per order (each side)
+ORDER_RATE = 10             # Maximum orders per second allowed by the API
 MIN_SPEED_BUMP = 0.01      # Minimum delay between orders (in seconds)
 CASE_START = 5             # Case start time (seconds)
 CASE_END = 295             # Case end time (seconds)
@@ -98,7 +98,7 @@ def modify_order(session, order):
     order_id = order.get('order_id')
     action = order.get('action')
     ticker = order.get('ticker')
-    volume = order.get('quantity')
+    volume = order.get('quantity') - order.get('quantity_filled')
     current_price = order.get('price')
     
     best_bid, best_ask = get_best_prices(session, ticker)
@@ -109,21 +109,26 @@ def modify_order(session, order):
         else:
             new_price = current_price
             
-        print(f"Buy\t{current_price}")
+        # print(f"Buy\t{current_price}")
     elif action == 'SELL':
         if best_ask is not None and best_ask < current_price:
             new_price = current_price - (current_price - best_ask) * 3 / 6
         else:
             new_price = current_price
-        print(f"SELL\t{current_price}")
+        # print(f"SELL\t{current_price}")
     else:
+        return False
+    
+    new_price = round(new_price, 2)
+    
+    if new_price == current_price:
         return False
 
     # Simulate modification by canceling and re‑submitting immediately.
     url = f'http://localhost:9999/v1/orders/{order_id}'
     response = session.delete(url)
     if response.status_code == 200:
-        # print(f"Modified order ID {order_id}: {action} {volume} shares moved from {current_price:.2f} to {new_price:.2f}.")
+        print(f"Modified order ID {order_id}: {action} {volume} shares moved from {current_price:.2f} to {new_price:.2f}.")
         payload = {
             'ticker': ticker,
             'type': 'LIMIT',
@@ -231,13 +236,13 @@ def main():
                 portfolio_position = get_portfolio_position(session)
                 
                 if (abs(portfolio_position) < 10000):
-                    ORDER_RATE = 10
+                    ORDER_VOLUME = 3000
                 elif (abs(portfolio_position) < 15000):
-                    ORDER_RATE = 5
+                    ORDER_VOLUME = 1500
                 elif (abs(portfolio_position) < 20000):
-                    ORDER_RATE = 2
+                    ORDER_VOLUME = 500
                 else:
-                    ORDER_RATE = 1
+                    ORDER_VOLUME = 100
                 # Get total pending volumes for BUY and SELL orders.
                 pending_buy, pending_sell = get_pending_volumes(session)
                 
@@ -246,11 +251,17 @@ def main():
                 # Potential exposure if we add a new SELL order:
                 potential_short = portfolio_position - pending_sell - ORDER_VOLUME
                 
+                
+                # print()
+                # print()
+                # print(f"{portfolio_position}\t{pending_buy}\t{pending_sell}")
+                
                 # print(f"Portfolio position: {portfolio_position}, Pending BUY: {pending_buy}, Pending SELL: {pending_sell}")
                 # print(f"Potential long if BUY added: {potential_long}, Potential short if SELL added: {potential_short}")
                 
                 # Adjust pending BUY orders by modifying the one farthest from the spread until safe.
-                while potential_long > POSITION_LIMIT:
+                if potential_long > POSITION_LIMIT:
+                    continue
                     # print("Adding another BUY order would exceed the long limit. Modifying the BUY order farthest from the spread...")
                     if not modify_farthest_order(session, 'BUY'):
                         # print("No BUY orders available to modify.")
@@ -259,17 +270,26 @@ def main():
                     potential_long = portfolio_position + pending_buy + ORDER_VOLUME
 
                 # Adjust pending SELL orders by modifying the one farthest from the spread until safe.
-                while potential_short < -POSITION_LIMIT:
+                if potential_short < -POSITION_LIMIT:
+                    continue
                     # print("Adding another SELL order would exceed the short limit. Modifying the SELL order farthest from the spread...")
                     if not modify_farthest_order(session, 'SELL'):
                         # print("No SELL orders available to modify.")
                         break
                     _, pending_sell = get_pending_volumes(session)
                     potential_short = portfolio_position - pending_sell - ORDER_VOLUME
+                a = portfolio_position + pending_buy + ORDER_VOLUME
+                b = portfolio_position - pending_sell - ORDER_VOLUME
                 
+                c = 3
+                # print(portfolio_position + pending_buy + ORDER_VOLUME, end="\t")
+                # print(portfolio_position - pending_sell - ORDER_VOLUME)
                 # Only place new paired orders if both sides are within limits after adding ORDER_VOLUME.
                 if (portfolio_position + pending_buy + ORDER_VOLUME <= POSITION_LIMIT) and \
                    (portfolio_position - pending_sell - ORDER_VOLUME >= -POSITION_LIMIT):
+                    a = portfolio_position + pending_buy + ORDER_VOLUME
+                    b = portfolio_position - pending_sell - ORDER_VOLUME
+                    
                     last_price = ticker_close(session, 'ALGO')
                     # print(f"Tick {tick}: Submitting new bid/ask pair at price {last_price:.2f}.")
                     txn_time = buy_sell(session, 'ALGO', last_price, SPREAD, ORDER_VOLUME)
@@ -284,6 +304,12 @@ def main():
                     sleep(1)
                 
                 tick = get_tick(session)
+                
+                # sleep(1)
+                # print(f"{portfolio_position}\t{pending_buy}\t{pending_sell}")
+
+                # print(portfolio_position + pending_buy, end="\t")
+                # print(portfolio_position - pending_sell)
             except ApiException as e:
                 # print("API Exception:", e)
                 break
