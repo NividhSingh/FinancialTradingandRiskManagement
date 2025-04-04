@@ -229,18 +229,18 @@ def main():
                 # Every 5 seconds, modify the farthest 10 orders (i.e. move them closer by half the distance).
                 if current_real_time - last_modify_time >= .5:
                     # print("Periodic modification: Modifying the farthest 10 orders toward the spread.")
-                    modify_farthest_n_orders(session, 1 )
+                    modify_farthest_n_orders(session, 1)
                     last_modify_time = current_real_time
 
                 # Calculate current net portfolio position (executed buys minus sells).
                 portfolio_position = get_portfolio_position(session)
                 
-                if (abs(portfolio_position) < 10000):
-                    ORDER_VOLUME = 2000
+                if (abs(portfolio_position) < 20000):
+                    ORDER_VOLUME = 5000
                 elif (abs(portfolio_position) < 15000):
-                    ORDER_VOLUME = 1000
+                    ORDER_VOLUME = 500
                 elif (abs(portfolio_position) < 20000):
-                    ORDER_VOLUME = 600
+                    ORDER_VOLUME = 300
                 else:
                     ORDER_VOLUME = 100
                 # Get total pending volumes for BUY and SELL orders.
