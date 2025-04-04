@@ -13,7 +13,7 @@ ORDER_RATE = 10             # Maximum orders per second allowed by the API
 MIN_SPEED_BUMP = 0.01      # Minimum delay between orders (in seconds)
 CASE_START = 5             # Case start time (seconds)
 CASE_END = 295             # Case end time (seconds)
-POSITION_LIMIT = 25000     # Maximum allowed net position (positive or negative)
+POSITION_LIMIT = 22000     # Maximum allowed net position (positive or negative)
 
 shutdown = False
 total_speed_bump = 0.0
@@ -227,20 +227,20 @@ def main():
             try:
                 current_real_time = time.time()
                 # Every 5 seconds, modify the farthest 10 orders (i.e. move them closer by half the distance).
-                if current_real_time - last_modify_time >= 1:
+                if current_real_time - last_modify_time >= .5:
                     # print("Periodic modification: Modifying the farthest 10 orders toward the spread.")
-                    modify_farthest_n_orders(session, 10)
+                    modify_farthest_n_orders(session, 1 )
                     last_modify_time = current_real_time
 
                 # Calculate current net portfolio position (executed buys minus sells).
                 portfolio_position = get_portfolio_position(session)
                 
                 if (abs(portfolio_position) < 10000):
-                    ORDER_VOLUME = 3000
+                    ORDER_VOLUME = 2000
                 elif (abs(portfolio_position) < 15000):
-                    ORDER_VOLUME = 1500
+                    ORDER_VOLUME = 1000
                 elif (abs(portfolio_position) < 20000):
-                    ORDER_VOLUME = 500
+                    ORDER_VOLUME = 600
                 else:
                     ORDER_VOLUME = 100
                 # Get total pending volumes for BUY and SELL orders.
